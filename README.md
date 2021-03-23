@@ -16,14 +16,14 @@
 * macos/linux `./lia play Jack John`
 7. A replay of the match should open in its' own window and be saved under `./replays`.
 8. Ai's written with different languages or sdk can be matched against each other.
-9. [API reference](https://docs.liagame.com/api/) of available functions and gamestate parameters
+9. [API reference](https://docs.liagame.com/api/) of available functions and gamestate parameters.
 10. [Strategy ideas](https://docs.liagame.com/strategy-ideas/)
 
 ## Rules
 
 1. Rules and game mechanics apply as described on [official game rules documentation](https://docs.liagame.com/game-rules). We are not using any rules customizations. If you toy with them, remember to revert default rules when testing for the win!
 2. Publish the ai that you wish to put against opposing teams at the root level of the repository. Organizer will use that ai for scheduled matches.
-3. Winner team is decided by playing every team's ai against each other. The ai that wins the most in three cycles of round robin scheduled at the end of the event is the winner. If there is a tie, one more round is run between tied teams, and most surviving units are used as a tie-breaker if there still a tie among three or more teams.
+3. Winner team is decided by playing every team's ai against each other. The ai that wins the most in three cycles of round robin scheduled at the end of the event is the winner. If there is a tie, one more round is run between tied teams, and most surviving units are used as a tie-breaker if there is still a tie among three or more teams.
 
 ## Troubleshoot
 
