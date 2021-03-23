@@ -1,0 +1,36 @@
+{
+  "version": "1.0.1",
+  "gamePort": 8887,
+  "languages": [
+    {
+      "name": "java",
+      "botUrl": "https://github.com/liagame/java-bot/archive/v1.0.0.zip",
+      "prepareUnix": "java_Prepare.sh",
+      "runUnix": "java_Run.sh",
+      "prepareWindows": "java_Prepare.bat",
+      "runWindows": "java_Run.bat",
+      "cleanupUnix": "java_Cleanup.sh",
+      "cleanupWindows": "java_Cleanup.bat"
+    },
+    {
+      "name": "kotlin",
+      "botUrl": "https://github.com/liagame/kotlin-bot/archive/v1.0.0.zip",
+      "prepareUnix": "java_Prepare.sh",
+      "runUnix": "java_Run.sh",
+      "prepareWindows": "java_Prepare.bat",
+      "runWindows": "java_Run.bat",
+      "cleanupUnix": "java_Cleanup.sh",
+      "cleanupWindows": "java_Cleanup.bat"
+    },
+    {
+      "name": "python3",
+      "botUrl": "https://github.com/liagame/python3-bot/archive/v1.0.0.zip",
+      "prepareUnix": "python3_Prepare.sh",
+      "runUnix": "python3_Run.sh",
+      "prepareWindows": "python3_Prepare.bat",
+      "runWindows": "python3_Run.bat",
+      "cleanupUnix": "python3_Cleanup.sh",
+      "cleanupWindows": "python3_Cleanup.bat"
+    }
+  ]
+}
