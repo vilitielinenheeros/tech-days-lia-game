@@ -7,12 +7,12 @@
 3. Options for coding language are python, java and [kotlin](https://kotlinlang.org/).
 4. Windows and macos sdk have been tested to be working and are included in this project. [Original project in github and sdk for linux](https://github.com/planet-lia/lia-SDK/releases/tag/v1.0.2)
 5. To create a bot/ai with your choice of language, run the `bot` command at sdk root
-* windows cmd `lia.exe bot python3 John`
-* powershell `.\lia.exe bot java John`
+* windows cmd `lia bot python3 John`
+* powershell `./lia bot java John`
 * macos/linux `./lia bot kotlin John`
 6. To run a match with ai's, run the `play` command
-* windows `lia.exe play John John`
-* powrshell `.\lia.exe play John Jack`
+* windows `lia play John John`
+* powrshell `./lia play John Jack`
 * macos/linux `./lia play Jack John`
 7. A replay of the match should open in its' own window and be saved under `./replays`.
 8. Ai's written with different languages or sdk can be matched against each other.
