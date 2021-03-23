@@ -7,11 +7,17 @@
 3. Options for coding language are python, java and [kotlin](https://kotlinlang.org/).
 4. Windows and macos sdk have been tested to be working and are included in this project. [Original project in github and sdk for linux](https://github.com/planet-lia/lia-SDK/releases/tag/v1.0.2)
 5. To create a bot/ai with your choice of language, run the following command at sdk root
-windows cmd `lia.exe bot java John` or powershell `.\lia.exe bot python3 John`
+
+windows cmd `lia.exe bot java John`
+powershell `.\lia.exe bot python3 John`
 macos/linux `./lia bot kotlin John`
+
 6. To run a match with ai named John against itself, run the following command
-windows `lia.exe play John John` or `.\lia.exe play John John`
+
+windows `lia.exe play John John`
+powrshell `.\lia.exe play John John`
 macos/linux `./lia play John John`
+
 7. A replay of the match should open in its' own window and be saved under `./replays`.
 8. Ai's written with different languages or sdk can be matched against each other.
 9. [API reference](https://docs.liagame.com/api/) of available functions and gamestate parameters
@@ -27,11 +33,11 @@ macos/linux `./lia play John John`
 
 ### When trying to create a python ai, the command throws an error about missing executable python file
 
-Solution: Run the following command in the sdk root: `virtualenv --python C:/{path to locally installed python}/python.exe venv`
+Run the following command in the sdk root: `virtualenv --python C:/{path to locally installed python}/python.exe venv`
 
 ### When trying run a match with a python ai, the command results in a loop with an error message about non-iterable locks
 
-Solution: In file bot/venv/Lib/site-package/websockets/protocol.py starting on line 736 there should be the following code block
+In file bot/venv/Lib/site-package/websockets/protocol.py starting on line 736 there should be the following code block
 ```
         try:
             # drain() cannot be called concurrently by multiple coroutines:
@@ -52,4 +58,4 @@ This code block can be removed when using newer versions of python and the match
 
 ### My windows-sdk python ai cannot be matched against macos-sdk python ai because of a missing file error
 
-Solution: Replace the contents of the `./{ai name}/venv` of the non-native ai to match the contents of the same directory of the ai native to your operating system.
+Replace the contents of the `./{ai name}/venv` of the non-native ai to match the contents of the same directory of the ai native to your operating system.
