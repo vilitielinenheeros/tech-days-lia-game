@@ -41,6 +41,23 @@ public class MyBot implements Bot {
         for (int i = 0; i < state.units.length; i++) {
             UnitData unit = state.units[i];
 
+            // If the unit is a worker and it sees at least one resource
+            // then make it go to the first resource to collect it.
+            if (unit.type == UnitType.WORKER) {
+                boolean anyOpponentIsLookingWorker = OpponentIsLooking(unit);
+                boolean healthIsLower = HealthIsLower(unit, api);
+                WorkerAction(unit, anyOpponentIsLookingWorker, api, healthIsLower);
+            }
+
+            // If the unit is a warrior and it sees an opponent then start shooting
+            if (unit.type == UnitType.WARRIOR && unit.opponentsInView.length > 0) {
+                OpponentInView opponent = DetermineOpponent(unit, targetOpponents);
+                targetOpponents.add(opponent);
+                float opponentAngle = GetOpponentAngle(unit, opponent);
+
+                WarriorAction(unit, opponent, opponentAngle, api);
+            }
+
             // If the unit is not going anywhere, we send it
             // to a random valid location on the map.
             if (unit.navigationPath.length == 0) {
@@ -58,23 +75,6 @@ public class MyBot implements Bot {
                         break;
                     }
                 }
-            }
-
-            // If the unit is a worker and it sees at least one resource
-            // then make it go to the first resource to collect it.
-            if (unit.type == UnitType.WORKER) {
-                boolean anyOpponentIsLookingWorker = OpponentIsLooking(unit);
-                boolean healthIsLower = HealthIsLower(unit, api);
-                WorkerAction(unit, anyOpponentIsLookingWorker, api, healthIsLower);
-            }
-
-            // If the unit is a warrior and it sees an opponent then start shooting
-            if (unit.type == UnitType.WARRIOR && unit.opponentsInView.length > 0) {
-                OpponentInView opponent = DetermineOpponent(unit, targetOpponents);
-                targetOpponents.add(opponent);
-                float opponentAngle = GetOpponentAngle(unit, opponent);
-
-                WarriorAction(unit, opponent, opponentAngle, api);
             }
 
             UpdatePreviousUnit(unit);
