@@ -1,6 +1,9 @@
 import lia.api.*;
 import lia.*;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 
 /**
@@ -10,6 +13,8 @@ import java.util.Random;
  */
 public class MyBot implements Bot {
 
+    public List<UnitData> previousUpdateUnits = new ArrayList<UnitData>();
+
 
     // This method is called 10 times per game second and holds current
     // game state. Use Api object to call actions on your units.
@@ -17,8 +22,9 @@ public class MyBot implements Bot {
     // - Api reference:       https://docs.liagame.com/api/#api-object
     @Override
     public void update(GameState state, Api api) {
-
         int numberOfWorkers = 0;
+        List<OpponentInView> targetOpponents = new ArrayList<OpponentInView>();
+
         for (UnitData unit : state.units) {
             if (unit.type == UnitType.WORKER) numberOfWorkers++;
         }
@@ -56,45 +62,128 @@ public class MyBot implements Bot {
 
             // If the unit is a worker and it sees at least one resource
             // then make it go to the first resource to collect it.
-            if (unit.type == UnitType.WORKER && unit.resourcesInView.length > 0) {
-                ResourceInView resource = unit.resourcesInView[0];
-                api.navigationStart(unit.id, resource.x, resource.y);
+            if (unit.type == UnitType.WORKER) {
+                boolean anyOpponentIsLookingWorker = OpponentIsLooking(unit);
+                boolean healthIsLower = HealthIsLower(unit, api);
+                WorkerAction(unit, anyOpponentIsLookingWorker, api, healthIsLower);
             }
 
             // If the unit is a warrior and it sees an opponent then start shooting
             if (unit.type == UnitType.WARRIOR && unit.opponentsInView.length > 0) {
-                OpponentInView opponent = unit.opponentsInView[0];
+                OpponentInView opponent = DetermineOpponent(unit, targetOpponents);
+                targetOpponents.add(opponent);
+                float opponentAngle = GetOpponentAngle(unit, opponent);
 
-                boolean opponentLooking = false;
-                float oppoAngle = 180;
-                for (int oppos = 0; oppos < unit.opponentsInView.length; oppos++) {
-                    OpponentInView curOppo = unit.opponentsInView[oppos];
-                    UnitData opponentData = new UnitData(curOppo.id, curOppo.type, curOppo.health, curOppo.x, curOppo.y, curOppo.orientationAngle, curOppo.speed, curOppo.rotation, false, 0, new OpponentInView[0], new BulletInView[0], new ResourceInView[0], new Point[0]);
-
-                    oppoAngle = MathUtil.angleBetweenUnitAndPoint(opponentData, unit.x, unit.y);
-
-                    opponentLooking = curOppo.type == UnitType.WARRIOR && oppoAngle < 5 && oppoAngle > -5;
-                }
-
-
-                float aimAngle = MathUtil.angleBetweenUnitAndPoint(unit, opponent.x, opponent.y);
-
-                if (opponentLooking) {
-                    api.saySomething(unit.id, "Run awaaayyy");
-                    api.navigationStart(unit.id, Constants.SPAWN_POINT.x, Constants.SPAWN_POINT.y, true);
-                } else if (aimAngle < -5) {
-                    api.setRotation(unit.id, Rotation.RIGHT);
-                } else if (aimAngle > 5) {
-                    api.setRotation(unit.id, Rotation.LEFT);
-                } else if (unit.canShoot) {
-                    api.saySomething(unit.id, this.getSomethingToSay());
-                    api.shoot(unit.id);
-                }
+                WarriorAction(unit, opponent, opponentAngle, api);
             }
+
+            UpdatePreviousUnit(unit);
         }
     }
 
-    public String getSomethingToSay() {
+    private boolean HealthIsLower(UnitData unit, Api api) {
+        int currentUnitId = unit.id;
+        boolean healthIsLower = false;
+
+        Optional<UnitData> existingUnit = previousUpdateUnits.stream().filter((previousUpdateUnit) -> previousUpdateUnit.id == currentUnitId).findFirst();
+
+        if (existingUnit.isPresent()) {
+            healthIsLower = existingUnit.get().health > unit.health;
+
+            if (healthIsLower) {
+                api.saySomething(unit.id, "Health is " + String.valueOf(unit.health));
+            }
+        }
+
+        return healthIsLower;
+    }
+
+    private void UpdatePreviousUnit(UnitData unit) {
+        int currentUnitId = unit.id;
+
+        previousUpdateUnits.removeIf((previousUpdateUnit) -> previousUpdateUnit.id == currentUnitId);
+
+        previousUpdateUnits.add(unit);
+    }
+
+    private void WorkerAction(UnitData unit, boolean anyOpponentIsLookingWorker, Api api, boolean healthIsLower) {
+        if (anyOpponentIsLookingWorker || healthIsLower) {
+            api.saySomething(unit.id, "Run awaaayyy");
+            api.navigationStart(unit.id, Constants.SPAWN_POINT.x, Constants.SPAWN_POINT.y, true);
+        } else if (unit.resourcesInView.length > 0) {
+            ResourceInView resource = unit.resourcesInView[0];
+            api.navigationStart(unit.id, resource.x, resource.y);
+        }
+    }
+
+    private float GetOpponentAngle(UnitData unit, OpponentInView opponent) {
+        UnitData opponentData = new UnitData(opponent.id, opponent.type, opponent.health, opponent.x, opponent.y, opponent.orientationAngle, opponent.speed, opponent.rotation, false, 0, new OpponentInView[0], new BulletInView[0], new ResourceInView[0], new Point[0]);
+
+        return MathUtil.angleBetweenUnitAndPoint(opponentData, unit.x, unit.y);
+    }
+
+    private boolean OpponentIsLooking(UnitData unit) {
+        boolean opponentIsLooking = false;
+
+        for (int oppos = 0; oppos < unit.opponentsInView.length; oppos++) {
+            OpponentInView curOppo = unit.opponentsInView[oppos];
+            UnitData opponentData = new UnitData(curOppo.id, curOppo.type, curOppo.health, curOppo.x, curOppo.y, curOppo.orientationAngle, curOppo.speed, curOppo.rotation, false, 0, new OpponentInView[0], new BulletInView[0], new ResourceInView[0], new Point[0]);
+
+            float oppoAngle = MathUtil.angleBetweenUnitAndPoint(opponentData, unit.x, unit.y);
+
+            opponentIsLooking = curOppo.type == UnitType.WARRIOR && Math.abs(oppoAngle) < 15;
+
+            if (opponentIsLooking) break;
+        }
+
+        return opponentIsLooking;
+    }
+
+    private OpponentInView DetermineOpponent(UnitData unit, List<OpponentInView> otherOpponents) {
+
+        OpponentInView opponent = unit.opponentsInView[0];
+
+        for (int oppos = 0; oppos < unit.opponentsInView.length; oppos++) {
+            int curIterationId = unit.opponentsInView[oppos].id;
+
+            Optional<OpponentInView> existingTarget = otherOpponents.stream().filter((opponentInView) -> opponentInView.id == curIterationId).findFirst();
+
+            if (existingTarget.isPresent()) {
+                opponent = existingTarget.get();
+                break;
+            }
+        }
+
+
+        return opponent;
+    }
+
+    private void WarriorAction(UnitData unit, OpponentInView opponent, float targetAngle, Api api) {
+        float aimAngle = MathUtil.angleBetweenUnitAndPoint(unit, opponent.x, opponent.y);
+        api.navigationStop(unit.id);
+
+
+        if (HealthIsLower(unit, api)) {
+            api.setRotation(unit.id, Rotation.RIGHT);
+        } else if (aimAngle < -5) {
+            if (Math.abs(targetAngle) > 15) {
+                api.setRotation(unit.id, Rotation.RIGHT);
+            } else {
+                api.setRotation(unit.id, Rotation.SLOW_RIGHT);
+            }
+        } else if (aimAngle > 5) {
+            if (Math.abs(targetAngle) > 15) {
+                api.setRotation(unit.id, Rotation.LEFT);
+            } else {
+                api.setRotation(unit.id, Rotation.SLOW_LEFT);
+            }
+        } else if (unit.canShoot) {
+            api.saySomething(unit.id, this.GetSomethingToSay());
+            api.shoot(unit.id);
+        }
+    }
+
+    private String GetSomethingToSay() {
         Random rng = new Random();
         int rint = rng.nextInt(4);
         String output = "";
