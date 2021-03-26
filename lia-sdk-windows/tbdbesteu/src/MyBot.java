@@ -1,10 +1,7 @@
 import lia.api.*;
 import lia.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 
 /**
  * Initial implementation keeps picking random locations on the map
@@ -14,6 +11,7 @@ import java.util.Random;
 public class MyBot implements Bot {
 
     public List<UnitData> previousUpdateUnits = new ArrayList<UnitData>();
+    public List<UnitData> guardBots = new ArrayList<UnitData>();
 
 
     // This method is called 10 times per game second and holds current
@@ -29,13 +27,15 @@ public class MyBot implements Bot {
             if (unit.type == UnitType.WORKER) numberOfWorkers++;
         }
 
-        if (numberOfWorkers / (float) state.units.length < 0.6f) {
+        if (numberOfWorkers / (float) state.units.length < 0.5f) {
             if (state.resources >= Constants.WORKER_PRICE) {
                 api.spawnUnit(UnitType.WORKER);
             }
         } else if (state.resources >= Constants.WARRIOR_PRICE) {
             api.spawnUnit(UnitType.WARRIOR);
         }
+
+        RemoveDeadGuardBots(state.units);
 
         // We iterate through all of our units that are still alive.
         for (int i = 0; i < state.units.length; i++) {
@@ -50,34 +50,83 @@ public class MyBot implements Bot {
             }
 
             // If the unit is a warrior and it sees an opponent then start shooting
-            if (unit.type == UnitType.WARRIOR && unit.opponentsInView.length > 0) {
-                OpponentInView opponent = DetermineOpponent(unit, targetOpponents);
-                targetOpponents.add(opponent);
-                float opponentAngle = GetOpponentAngle(unit, opponent);
+            if (unit.type == UnitType.WARRIOR) {
+                if (unit.opponentsInView.length > 0) {
+                    OpponentInView opponent = DetermineOpponent(unit, targetOpponents);
+                    targetOpponents.add(opponent);
+                    float opponentAngle = GetOpponentAngle(unit, opponent);
 
-                WarriorAction(unit, opponent, opponentAngle, api);
+                    WarriorAction(unit, opponent, opponentAngle, api);
+                }
+
+                AssignGuardBot(unit);
             }
 
             // If the unit is not going anywhere, we send it
             // to a random valid location on the map.
             if (unit.navigationPath.length == 0) {
 
-                // Generate new x and y until you get a position on the map
-                // where there is no obstacle. Then move the unit there.
-                while (true) {
-                    int x = (int) (Math.random() * Constants.MAP_WIDTH);
-                    int y = (int) (Math.random() * Constants.MAP_HEIGHT);
+                if (this.guardBots.stream().filter((guardBot) -> guardBot.id == unit.id).findFirst().isPresent()) {
+                    boolean bottomSpawn = Constants.SPAWN_POINT.y < (Constants.MAP_HEIGHT / 2);
 
-                    // Map is a 2D array of booleans. If map[x][y] equals false it means that
-                    // at (x,y) there is no obstacle and we can safely move our unit there.
-                    if (!Constants.MAP[x][y]) {
-                        api.navigationStart(unit.id, x, y);
-                        break;
+                    float distanceToCorner = bottomSpawn ? MathUtil.distance(unit.x, unit.y, 0, 0) : MathUtil.distance(unit.x, unit.y, Constants.MAP_WIDTH - 1, Constants.MAP_HEIGHT - 1);
+                    float lookDirection = bottomSpawn ? MathUtil.angleBetweenUnitAndPoint(unit, Constants.MAP_WIDTH - 1, Constants.MAP_HEIGHT - 1) : MathUtil.angleBetweenUnitAndPoint(unit, 0, 0);
+
+                    if (distanceToCorner > 6) {
+                        Random random = new Random();
+                        int rngPos = random.nextInt(5);
+                        int xPos = Constants.SPAWN_POINT.x < (Constants.MAP_WIDTH / 2) ? 0 + rngPos : Constants.MAP_WIDTH - 1 - rngPos;
+                        int yPos = Constants.SPAWN_POINT.y < (Constants.MAP_HEIGHT / 2) ? 0 + rngPos : Constants.MAP_HEIGHT - 1 - rngPos;
+                        api.navigationStart(unit.id, xPos, yPos);
+                    } else if (Math.abs(lookDirection) > 10) {
+                        api.setRotation(unit.id, Rotation.RIGHT);
+                    } else if (Math.abs(lookDirection) < 10) {
+                        api.navigationStop(unit.id);
+                        api.setSpeed(unit.id, Speed.NONE);
+                    }
+                } else {
+                    // Generate new x and y until you get a position on the map
+                    // where there is no obstacle. Then move the unit there.
+                    while (true) {
+                        int x = (int) (Math.random() * Constants.MAP_WIDTH);
+                        int y = (int) (Math.random() * Constants.MAP_HEIGHT);
+
+                        // Map is a 2D array of booleans. If map[x][y] equals false it means that
+                        // at (x,y) there is no obstacle and we can safely move our unit there.
+                        if (!Constants.MAP[x][y]) {
+                            api.navigationStart(unit.id, x, y);
+                            break;
+                        }
                     }
                 }
             }
 
             UpdatePreviousUnit(unit);
+        }
+    }
+
+    private void RemoveDeadGuardBots(UnitData[] units) {
+        List<UnitData> removeGuards = new ArrayList<UnitData>();
+
+        for (UnitData guardBot : this.guardBots) {
+            Optional<UnitData> existingUnit = Arrays.stream(units).filter((currentUnit) -> currentUnit.id == guardBot.id).findFirst();
+
+            if (!existingUnit.isPresent()) {
+                removeGuards.add(guardBot);
+            }
+        }
+
+        for (UnitData removeGuard : removeGuards) {
+            this.guardBots.removeIf((guardBot) -> guardBot.id == removeGuard.id);
+        }
+    }
+
+    private void AssignGuardBot(UnitData unit) {
+        int currentUnitId = unit.id;
+        UnitData existingUnit = this.guardBots.stream().filter((guardBot) -> guardBot.id == currentUnitId).findFirst().orElse(null);
+
+        if (existingUnit == null && this.guardBots.size() < 2) {
+            this.guardBots.add(unit);
         }
     }
 
