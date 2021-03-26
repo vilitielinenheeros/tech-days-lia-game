@@ -12,6 +12,7 @@ public class MyBot implements Bot {
 
     public List<UnitData> previousUpdateUnits = new ArrayList<UnitData>();
     public List<UnitData> guardBots = new ArrayList<UnitData>();
+    public List<UnitData> attackBots = new ArrayList<UnitData>();
 
 
     // This method is called 10 times per game second and holds current
@@ -36,6 +37,7 @@ public class MyBot implements Bot {
         }
 
         RemoveDeadGuardBots(state.units);
+        RemoveDeadAttackBots(state.units);
 
         // We iterate through all of our units that are still alive.
         for (int i = 0; i < state.units.length; i++) {
@@ -59,11 +61,40 @@ public class MyBot implements Bot {
                     WarriorAction(unit, opponent, opponentAngle, api, state);
                 } else {
                     AssignGuardBot(unit);
+                    AssignAttackBot(unit, state);
                     MoveWarrior(unit, api, state);
                 }
             }
 
             UpdatePreviousUnit(unit);
+        }
+    }
+
+    private void RemoveDeadAttackBots(UnitData[] units) {
+        List<UnitData> removeAttacks = new ArrayList<UnitData>();
+
+        for (UnitData attackBot : this.attackBots) {
+            Optional<UnitData> existingUnit = Arrays.stream(units).filter((currentUnit) -> currentUnit.id == attackBot.id).findFirst();
+
+            if (!existingUnit.isPresent()) {
+                removeAttacks.add(attackBot);
+            }
+        }
+
+        for (UnitData removeAttack : removeAttacks) {
+            this.attackBots.removeIf((guardBot) -> guardBot.id == removeAttack.id);
+        }
+    }
+
+    private void AssignAttackBot(UnitData unit, GameState state) {
+        int currentUnitId = unit.id;
+        long currentWarriorAmount = Arrays.stream(state.units).filter((oneUnit) -> oneUnit.type == UnitType.WARRIOR).count();
+
+        UnitData existingUnit = this.attackBots.stream().filter((attackBot) -> attackBot.id == currentUnitId).findFirst().orElse(null);
+        UnitData existingGuard = this.guardBots.stream().filter((guardBot) -> guardBot.id == currentUnitId).findFirst().orElse(null);
+
+        if (existingUnit == null && existingGuard == null && this.attackBots.stream().count() < 2 && currentWarriorAmount > 5) {
+            this.attackBots.add(unit);
         }
     }
 
@@ -83,6 +114,23 @@ public class MyBot implements Bot {
             } else if (Math.abs(lookDirection) > 10 && unit.speed == Speed.NONE) {
                 api.setRotation(unit.id, Rotation.RIGHT);
             } else if (Math.abs(lookDirection) < 10) {
+                api.navigationStop(unit.id);
+                api.setSpeed(unit.id, Speed.NONE);
+            }
+        } else if (this.attackBots.stream().filter((attackBot) -> attackBot.id == unit.id).findFirst().isPresent()) {
+            boolean bottomSpawn = Constants.SPAWN_POINT.y < (Constants.MAP_HEIGHT / 2);
+            float distanceToCorner = bottomSpawn ? MathUtil.distance(unit.x, unit.y, Constants.MAP_WIDTH -1, Constants.MAP_HEIGHT - 1) : MathUtil.distance(unit.x, unit.y, 0,0);
+            float lookDirection = bottomSpawn ? MathUtil.angleBetweenUnitAndPoint(unit, Constants.MAP_WIDTH -1, Constants.MAP_HEIGHT -1) : MathUtil.angleBetweenUnitAndPoint(unit, 0, 0 );
+
+            if (distanceToCorner > Constants.VIEWING_AREA_LENGTH - 2) {
+                if (bottomSpawn) {
+                    api.navigationStart(unit.id, Constants.MAP_WIDTH -1, Constants.MAP_HEIGHT - 1);
+                } else {
+                    api.navigationStart(unit.id, 0, 0);
+                }
+            } else if (Math.abs(lookDirection) > 10 && unit.speed == Speed.NONE) {
+                api.setRotation(unit.id, Rotation.LEFT);
+            } else {
                 api.navigationStop(unit.id);
                 api.setSpeed(unit.id, Speed.NONE);
             }
@@ -227,21 +275,7 @@ public class MyBot implements Bot {
         float aimAngle = MathUtil.angleBetweenUnitAndPoint(unit, opponent.x, opponent.y);
         api.navigationStop(unit.id);
 
-        if (HealthIsLower(unit, api)) {
-            api.setRotation(unit.id, Rotation.RIGHT);
-        } else if (aimAngle < -5) {
-            if (Math.abs(targetAngle) > 15) {
-                api.setRotation(unit.id, Rotation.RIGHT);
-            } else {
-                api.setRotation(unit.id, Rotation.SLOW_RIGHT);
-            }
-        } else if (aimAngle > 5) {
-            if (Math.abs(targetAngle) > 15) {
-                api.setRotation(unit.id, Rotation.LEFT);
-            } else {
-                api.setRotation(unit.id, Rotation.SLOW_LEFT);
-            }
-        } else if (unit.canShoot) {
+        if (Math.abs(aimAngle) < 2 && unit.canShoot) {
             boolean shouldShoot = true;
             for (UnitData otherUnit : state.units) {
                 if (otherUnit.id == unit.id || MathUtil.distance(unit.x, unit.y, otherUnit.x, otherUnit.y) > Constants.VIEWING_AREA_LENGTH)
@@ -253,6 +287,18 @@ public class MyBot implements Bot {
             if (shouldShoot) {
                 api.saySomething(unit.id, this.GetSomethingToSay());
                 api.shoot(unit.id);
+            }
+        } else if (aimAngle < -2) {
+            if (Math.abs(aimAngle) > 15) {
+                api.setRotation(unit.id, Rotation.RIGHT);
+            } else {
+                api.setRotation(unit.id, Rotation.SLOW_RIGHT);
+            }
+        } else if (aimAngle > 2) {
+            if (Math.abs(aimAngle) > 15) {
+                api.setRotation(unit.id, Rotation.LEFT);
+            } else {
+                api.setRotation(unit.id, Rotation.SLOW_LEFT);
             }
         }
     }
