@@ -1,3 +1,4 @@
+import com.sun.xml.internal.bind.v2.runtime.reflect.opt.Const;
 import lia.api.*;
 import lia.*;
 
@@ -56,52 +57,72 @@ public class MyBot implements Bot {
                     targetOpponents.add(opponent);
                     float opponentAngle = GetOpponentAngle(unit, opponent);
 
-                    WarriorAction(unit, opponent, opponentAngle, api);
-                }
-
-                AssignGuardBot(unit);
-            }
-
-            // If the unit is not going anywhere, we send it
-            // to a random valid location on the map.
-            if (unit.navigationPath.length == 0) {
-
-                if (this.guardBots.stream().filter((guardBot) -> guardBot.id == unit.id).findFirst().isPresent()) {
-                    boolean bottomSpawn = Constants.SPAWN_POINT.y < (Constants.MAP_HEIGHT / 2);
-
-                    float distanceToCorner = bottomSpawn ? MathUtil.distance(unit.x, unit.y, 0, 0) : MathUtil.distance(unit.x, unit.y, Constants.MAP_WIDTH - 1, Constants.MAP_HEIGHT - 1);
-                    float lookDirection = bottomSpawn ? MathUtil.angleBetweenUnitAndPoint(unit, Constants.MAP_WIDTH - 1, Constants.MAP_HEIGHT - 1) : MathUtil.angleBetweenUnitAndPoint(unit, 0, 0);
-
-                    if (distanceToCorner > 6) {
-                        Random random = new Random();
-                        int rngPos = random.nextInt(5);
-                        int xPos = Constants.SPAWN_POINT.x < (Constants.MAP_WIDTH / 2) ? 0 + rngPos : Constants.MAP_WIDTH - 1 - rngPos;
-                        int yPos = Constants.SPAWN_POINT.y < (Constants.MAP_HEIGHT / 2) ? 0 + rngPos : Constants.MAP_HEIGHT - 1 - rngPos;
-                        api.navigationStart(unit.id, xPos, yPos);
-                    } else if (Math.abs(lookDirection) > 10) {
-                        api.setRotation(unit.id, Rotation.RIGHT);
-                    } else if (Math.abs(lookDirection) < 10) {
-                        api.navigationStop(unit.id);
-                        api.setSpeed(unit.id, Speed.NONE);
-                    }
+                    WarriorAction(unit, opponent, opponentAngle, api, state);
                 } else {
-                    // Generate new x and y until you get a position on the map
-                    // where there is no obstacle. Then move the unit there.
-                    while (true) {
-                        int x = (int) (Math.random() * Constants.MAP_WIDTH);
-                        int y = (int) (Math.random() * Constants.MAP_HEIGHT);
-
-                        // Map is a 2D array of booleans. If map[x][y] equals false it means that
-                        // at (x,y) there is no obstacle and we can safely move our unit there.
-                        if (!Constants.MAP[x][y]) {
-                            api.navigationStart(unit.id, x, y);
-                            break;
-                        }
-                    }
+                    AssignGuardBot(unit);
+                    MoveWarrior(unit, api, state);
                 }
             }
 
             UpdatePreviousUnit(unit);
+        }
+    }
+
+    private void MoveWarrior(UnitData unit, Api api, GameState state) {
+        if (this.guardBots.stream().filter((guardBot) -> guardBot.id == unit.id).findFirst().isPresent()) {
+            boolean bottomSpawn = Constants.SPAWN_POINT.y < (Constants.MAP_HEIGHT / 2);
+
+            float distanceToCorner = bottomSpawn ? MathUtil.distance(unit.x, unit.y, 0, 0) : MathUtil.distance(unit.x, unit.y, Constants.MAP_WIDTH - 1, Constants.MAP_HEIGHT - 1);
+            float lookDirection = bottomSpawn ? MathUtil.angleBetweenUnitAndPoint(unit, Constants.MAP_WIDTH - 1, Constants.MAP_HEIGHT - 1) : MathUtil.angleBetweenUnitAndPoint(unit, 0, 0);
+
+            if (distanceToCorner > 6 && unit.speed == Speed.NONE) {
+                Random random = new Random();
+                int rngPos = random.nextInt(5);
+                int xPos = Constants.SPAWN_POINT.x < (Constants.MAP_WIDTH / 2) ? 0 + rngPos : Constants.MAP_WIDTH - 1 - rngPos;
+                int yPos = Constants.SPAWN_POINT.y < (Constants.MAP_HEIGHT / 2) ? 0 + rngPos : Constants.MAP_HEIGHT - 1 - rngPos;
+                api.navigationStart(unit.id, xPos, yPos);
+            } else if (Math.abs(lookDirection) > 10 && unit.speed == Speed.NONE) {
+                api.setRotation(unit.id, Rotation.RIGHT);
+            } else if (Math.abs(lookDirection) < 10) {
+                api.navigationStop(unit.id);
+                api.setSpeed(unit.id, Speed.NONE);
+            }
+        } else {
+            float shortestDistance = 9999;
+            UnitData workerToFollow = null;
+            for (UnitData worker : state.units) {
+                if (worker.type != UnitType.WORKER)
+                    continue;
+
+                float curDistance = MathUtil.distance(unit.x, unit.y, worker.x, worker.y);
+
+                if (curDistance < shortestDistance)
+                    workerToFollow = worker;
+            }
+
+            if (workerToFollow != null) {
+                float xFollowPos = (workerToFollow.x + 3) > Constants.MAP_WIDTH ? workerToFollow.x - 3 : workerToFollow.x + 3;
+                float yFollowPos = (workerToFollow.y + 3) > Constants.MAP_HEIGHT ? workerToFollow.y - 3 : workerToFollow.y + 3;
+                if (!Constants.MAP[(int)xFollowPos][(int)yFollowPos]) {
+                    xFollowPos = Constants.SPAWN_POINT.x;
+                    yFollowPos = Constants.SPAWN_POINT.y;
+                }
+
+
+                api.navigationStart(unit.id, xFollowPos, yFollowPos);
+            } else {
+                while (true) {
+                    int x = (int) (Math.random() * Constants.MAP_WIDTH);
+                    int y = (int) (Math.random() * Constants.MAP_HEIGHT);
+
+                    // Map is a 2D array of booleans. If map[x][y] equals false it means that
+                    // at (x,y) there is no obstacle and we can safely move our unit there.
+                    if (!Constants.MAP[x][y]) {
+                        api.navigationStart(unit.id, x, y);
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -162,6 +183,18 @@ public class MyBot implements Bot {
         } else if (unit.resourcesInView.length > 0) {
             ResourceInView resource = unit.resourcesInView[0];
             api.navigationStart(unit.id, resource.x, resource.y);
+        } else if (unit.navigationPath.length == 0) {
+            while (true) {
+                int x = (int) (Math.random() * Constants.MAP_WIDTH);
+                int y = (int) (Math.random() * Constants.MAP_HEIGHT);
+
+                // Map is a 2D array of booleans. If map[x][y] equals false it means that
+                // at (x,y) there is no obstacle and we can safely move our unit there.
+                if (!Constants.MAP[x][y]) {
+                    api.navigationStart(unit.id, x, y);
+                    break;
+                }
+            }
         }
     }
 
@@ -207,10 +240,9 @@ public class MyBot implements Bot {
         return opponent;
     }
 
-    private void WarriorAction(UnitData unit, OpponentInView opponent, float targetAngle, Api api) {
+    private void WarriorAction(UnitData unit, OpponentInView opponent, float targetAngle, Api api, GameState state) {
         float aimAngle = MathUtil.angleBetweenUnitAndPoint(unit, opponent.x, opponent.y);
         api.navigationStop(unit.id);
-
 
         if (HealthIsLower(unit, api)) {
             api.setRotation(unit.id, Rotation.RIGHT);
@@ -227,8 +259,18 @@ public class MyBot implements Bot {
                 api.setRotation(unit.id, Rotation.SLOW_LEFT);
             }
         } else if (unit.canShoot) {
-            api.saySomething(unit.id, this.GetSomethingToSay());
-            api.shoot(unit.id);
+            boolean shouldShoot = true;
+            for (UnitData otherUnit : state.units) {
+                if (otherUnit.id == unit.id)
+                    continue;
+
+                shouldShoot = Math.abs(MathUtil.angleBetweenUnitAndPoint(unit, otherUnit.x, otherUnit.y)) > 5;
+            }
+
+            if (shouldShoot) {
+                api.saySomething(unit.id, this.GetSomethingToSay());
+                api.shoot(unit.id);
+            }
         }
     }
 

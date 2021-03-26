@@ -13,6 +13,8 @@ build/
 *.ipr
 *.iws
 
+hs_err_*
+
 # local configuration file (for Android sdk path, etc)
 local.properties
 
