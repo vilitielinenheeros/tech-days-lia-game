@@ -244,7 +244,7 @@ public class MyBot implements Bot {
         } else if (unit.canShoot) {
             boolean shouldShoot = true;
             for (UnitData otherUnit : state.units) {
-                if (otherUnit.id == unit.id)
+                if (otherUnit.id == unit.id || MathUtil.distance(unit.x, unit.y, otherUnit.x, otherUnit.y) > Constants.VIEWING_AREA_LENGTH)
                     continue;
 
                 shouldShoot = Math.abs(MathUtil.angleBetweenUnitAndPoint(unit, otherUnit.x, otherUnit.y)) > 5;
