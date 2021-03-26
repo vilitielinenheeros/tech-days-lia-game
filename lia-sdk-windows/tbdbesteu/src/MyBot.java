@@ -1,4 +1,3 @@
-import com.sun.xml.internal.bind.v2.runtime.reflect.opt.Const;
 import lia.api.*;
 import lia.*;
 
@@ -101,26 +100,10 @@ public class MyBot implements Bot {
             }
 
             if (workerToFollow != null) {
-                float xFollowPos = (workerToFollow.x + 3) > Constants.MAP_WIDTH ? workerToFollow.x - 3 : workerToFollow.x + 3;
-                float yFollowPos = (workerToFollow.y + 3) > Constants.MAP_HEIGHT ? workerToFollow.y - 3 : workerToFollow.y + 3;
-                if (!Constants.MAP[(int)xFollowPos][(int)yFollowPos]) {
-                    xFollowPos = Constants.SPAWN_POINT.x;
-                    yFollowPos = Constants.SPAWN_POINT.y;
-                }
-
-
-                api.navigationStart(unit.id, xFollowPos, yFollowPos);
-            } else {
-                while (true) {
-                    int x = (int) (Math.random() * Constants.MAP_WIDTH);
-                    int y = (int) (Math.random() * Constants.MAP_HEIGHT);
-
-                    // Map is a 2D array of booleans. If map[x][y] equals false it means that
-                    // at (x,y) there is no obstacle and we can safely move our unit there.
-                    if (!Constants.MAP[x][y]) {
-                        api.navigationStart(unit.id, x, y);
-                        break;
-                    }
+                float xFollowPos = workerToFollow.x + 3;
+                float yFollowPos = workerToFollow.y + 3;
+                if (xFollowPos < (Constants.MAP_WIDTH - 1) && yFollowPos < (Constants.MAP_HEIGHT - 1)) {
+                    api.navigationStart(unit.id, xFollowPos, yFollowPos);
                 }
             }
         }
